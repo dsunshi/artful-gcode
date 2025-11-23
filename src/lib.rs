@@ -20,6 +20,7 @@ pub struct Printer {
     pub height: f32,
     scale: Option<(f32, f32)>,
     commands:   Vec<String>,
+    gcode: Vec<Code>,
 }
 
 pub enum Code {
@@ -97,12 +98,15 @@ impl Printer {
         }
 
         self.commands.push(format!("; draw_point({:.1}, {:.1})", xp, yp));
-        // self.commands.push(format!("M117 ({:.1}, {:.1}) -> ({:.1}, {:.1})", xp, yp, x, y));
+        self.gcode.push(Code::Comment(format!("draw_point({:.1}, {:.1})", xp, yp)));
         
         self.commands.push(format!("G{} X{:.1} Y{:.1} F{:.1}", G_MODE, x, y, FEED_RATE));
+        self.gcode.push(move_xy(x, y, FEED_RATE));
         // Pen down for the dot
         self.commands.push(format!("G{} Z{:.1} F100", G_MODE,  Z_PLUNGE));
         self.commands.push(format!("G{} Z{:.1} F100", G_MODE,  Z0));
+        self.gcode.push(move_z(Z_PLUNGE, 100.0));
+        self.gcode.push(move_z(Z0, 100.0));
         // self.commands.push("G91   ; Switch to relative coordinates".to_owned());
         // self.commands.push(format!("G1 Z-{:.1} F100", Z_PLUNGE));
         // self.commands.push(format!("G1 Z{:.1}  F100", Z_PLUNGE));
