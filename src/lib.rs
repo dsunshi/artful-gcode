@@ -1,5 +1,6 @@
 use std::io::prelude::*;
 use std::fs::File;
+use std::fmt;
 
 const FEED_RATE: f32 = 1000.0;
 
@@ -17,6 +18,20 @@ pub struct Printer {
     pub height: f32,
     scale: Option<(f32, f32)>,
     commands:   Vec<String>,
+}
+
+enum Code {
+    Message(String),
+    DisableMotors
+}
+
+impl fmt::Display for Code {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Code::Message(m)    => write!(f, "M117 {}", m),
+            Code::DisableMotors => write!(f, "M84 ; disable motors"),
+        }
+    }
 }
 
 impl Printer {
@@ -121,6 +136,8 @@ mod tests {
     use super::*;
 
     #[test]
-    fn it_works() {
+    fn code_enum() {
+        let c: Code = Code::Message("Hello".to_owned());
+        assert_eq!(c.to_string(), "M117 Hello");
     }
 }
