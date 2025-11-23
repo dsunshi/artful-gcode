@@ -41,6 +41,13 @@ fn coord(c: char, val: &Option<f32>) -> String {
     }
 }
 
+fn move_xy(x: f32, y: f32, speed: f32) -> Code {
+    Code::Move(Some(x), Some(y), None, speed)
+}
+
+fn move_z(z: f32, speed: f32) -> Code {
+    Code::Move(None, None, Some(z), speed)
+}
 
 impl fmt::Display for Code {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -236,11 +243,22 @@ mod tests {
             assert_eq!(c.to_string(), "G28 W");
         }
     }
-    // Code::Move(x, y, z, feed) => write!(f, "G{} {} {} {} {}", G_MODE, coord('X', x), coord('Y', y), coord('Z', z), coord('F', &Some(*feed)))
 
     #[test]
     fn code_move() {
         let c: Code = Code::Move(None, None, None, 0.0);
         assert_eq!(c.to_string(), format!("G{} F0.0 ", G_MODE));
+        
+        let c: Code = Code::Move(Some(1.0), None, None, 1000.0);
+        assert_eq!(c.to_string(), format!("G{} X1.0 F1000.0 ", G_MODE));
+        
+        let c: Code = Code::Move(Some(1.0), Some(2.0), None, 1000.0);
+        assert_eq!(c.to_string(), format!("G{} X1.0 Y2.0 F1000.0 ", G_MODE));
+        
+        let c: Code = Code::Move(Some(1.0), Some(2.0), Some(3.0), 1000.0);
+        assert_eq!(c.to_string(), format!("G{} X1.0 Y2.0 Z3.0 F1000.0 ", G_MODE));
+        
+        let c: Code = Code::Move(None, None, Some(10.0), 500.0);
+        assert_eq!(c.to_string(), format!("G{} Z10.0 F500.0 ", G_MODE));
     }
 } 
