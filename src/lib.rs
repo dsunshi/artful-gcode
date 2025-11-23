@@ -11,6 +11,8 @@ const Z_PLUNGE: f32 = 4.0;
 
 const G_MODE: u32 = 0;
 
+const COMMENTS: bool = true;
+
 pub struct Printer {
     min: (f32, f32),
     _max: (f32, f32),
@@ -20,26 +22,46 @@ pub struct Printer {
     commands:   Vec<String>,
 }
 
-enum Code {
+pub enum Code {
+    Comment(String),
+    Model(String),
     Message(String),
-    DisableMotors
+    DisableMotors,
+    UnitsMM,
+    AbsoluteCoord,
+    Move(Option<f32>, Option<f32>, Option<f32>, f32),
+    Home,
 }
+
+fn coord(c: char, val: &Option<f32>) -> String {
+    if let Some(v) = val {
+        format!("{}{:.1} ", c, v)
+    } else {
+        "".to_string()
+    }
+}
+
 
 impl fmt::Display for Code {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             Code::Message(m)    => write!(f, "M117 {}", m),
-            Code::DisableMotors => write!(f, "M84 ; disable motors"),
+            Code::Comment(c)    => write!(f, "; {}", c),
+            Code::Model(m)      => if COMMENTS { write!(f, "M862.3 P {} ; printer model check", m) } else { write!(f, "M862.3 P {}", m) },
+            Code::DisableMotors => if COMMENTS { write!(f, "M84 ; disable motors") } else { write!(f, "M84") },
+            Code::UnitsMM       => if COMMENTS { write!(f, "G21 ; set units to millimeters") } else { write!(f, "G21") },
+            Code::AbsoluteCoord => if COMMENTS { write!(f, "G90 ; use absolute coordinates") } else { write!(f, "G90") },
+            Code::Home          => if COMMENTS { write!(f, "G28 W ; home all without mesh bed level") } else { write!(f, "M84") },
+            Code::Move(x, y, z, feed) => write!(f, "G{} {}{}{}{}", G_MODE, coord('X', x), coord('Y', y), coord('Z', z), coord('F', &Some(*feed)))
         }
     }
 }
 
 impl Printer {
-    pub fn new( (minx, miny): (f32, f32),
-                (maxx, maxy): (f32, f32)) -> Self {
+    pub fn new((minx, miny): (f32, f32), (maxx, maxy): (f32, f32)) -> Self {
         Printer {
             min:     (minx, miny),
-            _max:     (maxx, maxy),
+            _max:    (maxx, maxy),
             width:    maxx - minx,
             height:   maxy - miny,
             scale:    None,
@@ -131,13 +153,94 @@ impl Printer {
     }
 }
 
+fn write_code(f: &mut File, c: Code) {
+    _ = f.write_all(c.to_string().as_bytes());
+    _ = f.write_all("\n".as_bytes());
+}
+
+fn gcode_header() -> Vec<Code> {
+    vec![
+        Code::Model("MK3S".to_owned()),
+        Code::UnitsMM,
+        Code::AbsoluteCoord,
+        Code::Home,
+    ]
+}
+
+fn gcode_footer() -> Vec<Code> {
+    vec![
+        Code::Comment("Lift the head up before turning off".to_string()),
+        Code::DisableMotors
+    ]
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
-    fn code_enum() {
+    fn code_mesage() {
         let c: Code = Code::Message("Hello".to_owned());
         assert_eq!(c.to_string(), "M117 Hello");
+        
+        let c: Code = Code::Message(format!("{:.1}%", 50.3));
+        assert_eq!(c.to_string(), "M117 50.3%");
     }
-}
+    
+    #[test]
+    fn code_disable_motors() {
+        let c: Code = Code::DisableMotors;
+        if COMMENTS {
+            assert_eq!(c.to_string(), "M84 ; disable motors");
+        } else {
+            assert_eq!(c.to_string(), "M84");
+        }
+    }
+
+    #[test]
+    fn code_model() {
+        let c: Code = Code::Model("MK3S".to_owned());
+        if COMMENTS {
+            assert_eq!(c.to_string(), "M862.3 P MK3S ; printer model check");
+        } else {
+            assert_eq!(c.to_string(), "M862.3 P MK3S");
+        }
+    }
+
+    #[test]
+    fn code_units_mm() {
+        let c: Code = Code::UnitsMM;
+        if COMMENTS {
+            assert_eq!(c.to_string(), "G21 ; set units to millimeters");
+        } else {
+            assert_eq!(c.to_string(), "G21");
+        }
+    }
+
+    #[test]
+    fn code_absolute_coords() {
+        let c: Code = Code::AbsoluteCoord;
+        if COMMENTS {
+            assert_eq!(c.to_string(), "G90 ; use absolute coordinates");
+        } else {
+            assert_eq!(c.to_string(), "G90");
+        }
+    }
+
+    #[test]
+    fn code_home_all() {
+        let c: Code = Code::Home;
+        if COMMENTS {
+            assert_eq!(c.to_string(), "G28 W ; home all without mesh bed level");
+        } else {
+            assert_eq!(c.to_string(), "G28 W");
+        }
+    }
+    // Code::Move(x, y, z, feed) => write!(f, "G{} {} {} {} {}", G_MODE, coord('X', x), coord('Y', y), coord('Z', z), coord('F', &Some(*feed)))
+
+    #[test]
+    fn code_move() {
+        let c: Code = Code::Move(None, None, None, 0.0);
+        assert_eq!(c.to_string(), format!("G{} F0.0 ", G_MODE));
+    }
+} 
