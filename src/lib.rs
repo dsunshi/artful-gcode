@@ -6,6 +6,9 @@ use std::io::prelude::*;
 const G_MODE:  u32 = 0;
 const Z_RESET: f32 = 80.0;
 
+const SPEED: f32 = 200.0;
+const MAX_FEED: f32 = 1000.0;
+
 #[derive(Debug, Clone)]
 pub struct Source {
     code:    &'static str,
@@ -141,6 +144,7 @@ impl fmt::Display for Code {
     }
 }
 
+
 impl Printer {
 
     pub fn new(config: PrinterConfig) -> Self {
@@ -169,6 +173,49 @@ impl Printer {
         self.code.push(Code::Move(Point{x: None,    y: None,    z: Some(self.config.z_plunge)}, self.config.plunge_speed));
         self.code.push(Code::Move(Point{x: None,    y: None,    z: Some(self.config.z0)},       self.config.retract_speed));
         self.code.push(Code::NOP);
+    }
+
+    fn calc_total_time(&self) -> f32 {
+        let mut pos_x = self.config.min.0;
+        let mut pos_y = self.config.min.1;
+        let mut pos_z = self.config.z0;
+        let mut total_dist = 0.0;
+        
+        for c in &self.code {
+
+            if let Code::Move(p, f) = c {
+                let speed_scale = f / MAX_FEED;
+
+                let dx = if let Some(px) = p.x {
+                    pos_x - px
+                } else {
+                    0.0
+                };
+
+                let dy = if let Some(py) = p.y {
+                    pos_y - py
+                } else {
+                    0.0
+                };
+
+                let dz = if let Some(pz) = p.z {
+                    pos_z - pz
+                } else {
+                    0.0
+                };
+
+                total_dist += dx / speed_scale;
+                total_dist += dy / speed_scale;
+                total_dist += dz / speed_scale;
+
+                pos_x += dx;
+                pos_y += dy;
+                pos_z += dz;
+            }
+
+        }
+
+        total_dist / SPEED // Should be approx. the number of seconds this will take to print
     }
 
     pub fn save(&self, filename: &str) {
@@ -210,12 +257,18 @@ impl Printer {
         let mut count = 1;
         // TODO: Configurable
         let skip = 100;
+        let total_time = Self::calc_total_time(self) as u32;
         for c in &self.code {
             write_code(&mut file, c.clone());
 
             if count % skip == 0 {
-                let percent: f32 = ((count as f32) / (self.code.len() as f32)) * 100.0;
-                write_code(&mut file, Code::Message(format!("{:.1}%", percent)));
+                let percent: f32 = (count as f32) / (self.code.len() as f32);
+                let total_seconds = ((1.0 - percent) * total_time as f32) as u32;
+                let hours = total_seconds / 3600;
+                let minutes = (total_seconds % 3600) / 60;
+                let seconds = total_seconds % 60;
+
+                write_code(&mut file, Code::Message(format!("{:.1}% R{:02}:{:02}:{:02}", percent * 100.0, hours, minutes, seconds)));
             }
 
             count = count + 1;
@@ -226,6 +279,7 @@ impl Printer {
         }
     }
 }
+
 #[cfg(test)]
 mod tests {
     use super::*;
