@@ -31,15 +31,15 @@ pub enum Code {
 
 #[derive(Debug, Clone)]
 pub struct PrinterConfig {
-    model: Option<Code>,
-    min: (f32, f32),
-    max: (f32, f32),
-    scale: Option<(f32, f32)>,
-    z0: f32,
-    z_plunge: f32,
-    move_speed: f32,
-    plunge_speed: f32,
-    retract_speed: f32,
+    pub model: Option<Code>,
+    pub min: (f32, f32),
+    pub max: (f32, f32),
+    pub scale: Option<(f32, f32)>,
+    pub z0: f32,
+    pub z_plunge: f32,
+    pub move_speed: f32,
+    pub plunge_speed: f32,
+    pub retract_speed: f32,
 }
 
 pub struct Printer {
