@@ -206,15 +206,18 @@ impl Printer {
             write_code(&mut file, c);
         }
 
-        // let mut count = 1;
-        // // TODO: Configurable
-        // let skip = 100;
+        let mut count = 1;
+        // TODO: Configurable
+        let skip = 100;
         for c in &self.code {
             write_code(&mut file, c.clone());
-        //     if count % skip == 0 {
-        //         let percent: f32 = ((count as f32) / (self.commands.len() as f32)) * 100.0;
-        //         _ = file.write_all(format!("M117 {:.1}%\n", percent).as_bytes());
-        //     }
+
+            if count % skip == 0 {
+                let percent: f32 = ((count as f32) / (self.code.len() as f32)) * 100.0;
+                write_code(&mut file, Code::Comment(format!("{:.1}%", percent)));
+            }
+
+            count += 1;
         }
         
         for c in footer {
