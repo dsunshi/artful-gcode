@@ -48,6 +48,14 @@ pub struct Printer {
     pub height: f32,
 }
 
+macro_rules! raw{
+    ($a: expr, $b: expr) => {
+        {
+            Code::Raw(Source {code: $a, comment: Some($b)});
+        }
+    }
+}
+
 const HOME: Code       = Code::Raw(Source {code: "G28 W",     comment: Some("Home all without mesh bed level")});
 const UNITS_MM: Code   = Code::Raw(Source {code: "G21",       comment: Some("Set units to millimeters")});
 const ABS_COORD: Code  = Code::Raw(Source {code: "G90",       comment: Some("Use absolute coordinates")});
@@ -64,6 +72,11 @@ fn render_coord(axis: char, v: Option<f32>) -> String {
     } else {
         "".to_string()
     }
+}
+
+fn write_code(f: &mut File, c: Code) {
+    _ = f.write_all(c.to_string().as_bytes());
+    _ = f.write_all("\n".as_bytes());
 }
 
 impl fmt::Display for Point {
@@ -120,9 +133,6 @@ impl fmt::Display for Code {
     }
 }
 
-impl Code {
-}
-
 impl Printer {
 
     pub fn new(config: PrinterConfig) -> Self {
@@ -154,48 +164,52 @@ impl Printer {
 
     pub fn save(&self, filename: &str) {
         let mut file = File::create(filename).unwrap();
-        let mut commands: Vec<Code> = Vec::new();
+        let mut header: Vec<Code> = Vec::new();
+        let mut footer: Vec<Code> = Vec::new();
 
-        commands.push(Code::Comment("Start of generated code".to_string()));
+        // header
+        header.push(Code::Comment("Start of generated code".to_string()));
         if let Some(model) = &self.config.model {
-            commands.push(model.clone());
+            header.push(model.clone());
         }
-        commands.push(UNITS_MM);
-        commands.push(ABS_COORD);
-        commands.push(HOME);
+        header.push(UNITS_MM);
+        header.push(ABS_COORD);
+        header.push(HOME);
         
-        commands.push(Code::Move(Point{
+        header.push(Code::Move(Point{
             x: Some(self.config.min.0),
             y: Some(self.config.min.1),
             z: Some(self.config.z0)},
             self.config.move_speed));
-        commands.push(SET_ORIGIN);
-        commands.push(Code::Message("0.0%".to_string()));
+        header.push(SET_ORIGIN);
+        header.push(Code::Message("0.0%".to_string()));
+        
+        // footer
+        footer.push(Code::Comment("Lift the head up before turning off".to_string()));
+        footer.push(Code::Move(Point{
+            x: None, y: None, z: Some(Z_RESET)},
+            self.config.move_speed));
+        footer.push(OFF);
 
+        for c in header {
+            write_code(&mut file, c);
+        }
 
         // let mut count = 1;
         // // TODO: Configurable
         // let skip = 100;
-        // for cmd in &self.commands {
-        //     // TODO: what about errors?
-        //     _ = file.write_all(cmd.as_bytes());
-        //     _ = file.write_all("\n".as_bytes());
-        //
+        for c in &self.code {
+            write_code(&mut file, c.clone());
         //     if count % skip == 0 {
         //         let percent: f32 = ((count as f32) / (self.commands.len() as f32)) * 100.0;
         //         _ = file.write_all(format!("M117 {:.1}%\n", percent).as_bytes());
         //     }
-        //
-        //     count += 1;
-        // }
-        commands.push(Code::Comment("Lift the head up before turning off".to_string()));
-        commands.push(Code::Move(Point{
-            x: None, y: None, z: Some(Z_RESET)},
-            self.config.move_speed));
-        commands.push(OFF);
+        }
+        
+        for c in footer {
+            write_code(&mut file, c);
+        }
     }
-
-
 }
 
 fn main() {
@@ -216,8 +230,8 @@ fn main() {
 
     let config: PrinterConfig = PrinterConfig {
         model: Some(Code::Model("MK3S".to_string())),
-        min:   (0.0, 0.0),
-        max:   (0.0, 0.0),
+        min:   (50.0,  35.0),
+        max:   (254.0, 212.0),
         scale: None,
         z0:       6.5,
         z_plunge: 4.0,
