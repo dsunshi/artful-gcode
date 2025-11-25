@@ -26,6 +26,7 @@ pub enum Code {
     Message(String),
     Move(Point, f32),
     Raw(Source),
+    NOP
 }
 
 #[derive(Debug, Clone)]
@@ -51,16 +52,21 @@ pub struct Printer {
 macro_rules! raw{
     ($a: expr, $b: expr) => {
         {
-            Code::Raw(Source {code: $a, comment: Some($b)});
+            Code::Raw(Source {code: $a, comment: Some($b)})
+        }
+    };
+    ($a: expr) => {
+        {
+            Code::Raw(Source {code: $a, comment: None})
         }
     }
 }
 
-const HOME: Code       = Code::Raw(Source {code: "G28 W",     comment: Some("Home all without mesh bed level")});
-const UNITS_MM: Code   = Code::Raw(Source {code: "G21",       comment: Some("Set units to millimeters")});
-const ABS_COORD: Code  = Code::Raw(Source {code: "G90",       comment: Some("Use absolute coordinates")});
-const SET_ORIGIN: Code = Code::Raw(Source {code: "G92 X0 Y0", comment: Some("Set current position to origin")});
-const OFF: Code        = Code::Raw(Source {code: "M84",       comment: Some("Disable motors")});
+const HOME: Code       = raw!("G28 W",     "Home all without mesh bed level");
+const UNITS_MM: Code   = raw!("G21",       "Set units to millimeters");
+const ABS_COORD: Code  = raw!("G90",       "Use absolute coordinates");
+const SET_ORIGIN: Code = raw!("G92 X0 Y0", "Set current position to origin");
+const OFF: Code        = raw!("M84",       "Disable motors");
 
 fn rescale(m: f32, rmin: f32, rmax: f32, tmin: f32, tmax: f32) -> f32 {
     ((m - rmin) / (rmax - rmin)) * (tmax - tmin) + tmin
@@ -125,10 +131,11 @@ impl fmt::Display for Code {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             Code::Comment(c) => write!(f, "; {}", c),
-            Code::Model(m)   => write!(f, "M862.3 P {} ; printer model check", m),
+            Code::Model(m)   => write!(f, "M862.3 P \"{}\" ; printer model check", m),
             Code::Message(m) => write!(f, "M117 {}", m),
             Code::Move(p, s) => write!(f, "{}", render_move(p, s)),
             Code::Raw(src)   => write!(f, "{}", src.to_string()),
+            Code::NOP        => write!(f, ""),
         }
     }
 }
@@ -157,9 +164,10 @@ impl Printer {
         }
 
         self.code.push(Code::Comment(format!("draw_point({:.1}, {:.1})", xp, yp)));
-        self.code.push(Code::Move(Point{x: Some(x), y: Some(y), z: None}, self.config.move_speed));
-        self.code.push(Code::Move(Point{x: None, y: None, z: Some(self.config.z_plunge)}, self.config.plunge_speed));
-        self.code.push(Code::Move(Point{x: None, y: None, z: Some(self.config.z0)}, self.config.retract_speed));
+        self.code.push(Code::Move(Point{x: Some(x), y: Some(y), z: None},                       self.config.move_speed));
+        self.code.push(Code::Move(Point{x: None,    y: None,    z: Some(self.config.z_plunge)}, self.config.plunge_speed));
+        self.code.push(Code::Move(Point{x: None,    y: None,    z: Some(self.config.z0)},       self.config.retract_speed));
+        self.code.push(Code::NOP);
     }
 
     pub fn save(&self, filename: &str) {
@@ -175,6 +183,7 @@ impl Printer {
         header.push(UNITS_MM);
         header.push(ABS_COORD);
         header.push(HOME);
+        header.push(Code::NOP);
         
         header.push(Code::Move(Point{
             x: Some(self.config.min.0),
@@ -183,6 +192,7 @@ impl Printer {
             self.config.move_speed));
         header.push(SET_ORIGIN);
         header.push(Code::Message("0.0%".to_string()));
+        header.push(Code::NOP);
         
         // footer
         footer.push(Code::Comment("Lift the head up before turning off".to_string()));
@@ -190,6 +200,7 @@ impl Printer {
             x: None, y: None, z: Some(Z_RESET)},
             self.config.move_speed));
         footer.push(OFF);
+        header.push(Code::NOP);
 
         for c in header {
             write_code(&mut file, c);
@@ -224,55 +235,11 @@ mod tests {
         assert_eq!(c.to_string(), "M117 50.3%");
     }
     
-    // #[test]
-    // fn code_disable_motors() {
-    //     let c: Code = Code::DisableMotors;
-    //     if COMMENTS {
-    //         assert_eq!(c.to_string(), "M84 ; disable motors");
-    //     } else {
-    //         assert_eq!(c.to_string(), "M84");
-    //     }
-    // }
-    //
-    // #[test]
-    // fn code_model() {
-    //     let c: Code = Code::Model("MK3S".to_owned());
-    //     if COMMENTS {
-    //         assert_eq!(c.to_string(), "M862.3 P MK3S ; printer model check");
-    //     } else {
-    //         assert_eq!(c.to_string(), "M862.3 P MK3S");
-    //     }
-    // }
-    //
-    // #[test]
-    // fn code_units_mm() {
-    //     let c: Code = Code::UnitsMM;
-    //     if COMMENTS {
-    //         assert_eq!(c.to_string(), "G21 ; set units to millimeters");
-    //     } else {
-    //         assert_eq!(c.to_string(), "G21");
-    //     }
-    // }
-    //
-    // #[test]
-    // fn code_absolute_coords() {
-    //     let c: Code = Code::AbsoluteCoord;
-    //     if COMMENTS {
-    //         assert_eq!(c.to_string(), "G90 ; use absolute coordinates");
-    //     } else {
-    //         assert_eq!(c.to_string(), "G90");
-    //     }
-    // }
-    //
-    // #[test]
-    // fn code_home_all() {
-    //     let c: Code = Code::Home;
-    //     if COMMENTS {
-    //         assert_eq!(c.to_string(), "G28 W ; home all without mesh bed level");
-    //     } else {
-    //         assert_eq!(c.to_string(), "G28 W");
-    //     }
-    // }
+    #[test]
+    fn code_model() {
+        let c: Code = Code::Model("MK3S".to_owned());
+        assert_eq!(c.to_string(), "M862.3 P \"MK3S\" ; printer model check");
+    }
 
     #[test]
     fn code_move() {
@@ -303,5 +270,23 @@ mod tests {
         let p = Point{x: None, y: Some(1.0), z: None};
         let c: Code = Code::Move(p, 1000.0);
         assert_eq!(c.to_string(), format!("G{} Y1.0 F1000.0", G_MODE));
+    }
+
+    #[test]
+    fn simple_example() {
+        let config: PrinterConfig = PrinterConfig {
+            model: Some(Code::Model("MK3S".to_string())),
+            min:   (50.0,  35.0),
+            max:   (254.0, 212.0),
+            scale: None,
+            z0:       6.5,
+            z_plunge: 4.0,
+            move_speed:    1000.0,
+            plunge_speed:  500.0,
+            retract_speed: 800.0
+        };
+        let mut printer = Printer::new(config);
+        printer.draw_point(50.0, 50.0);
+        printer.save("simple_example.gcode");
     }
 } 
