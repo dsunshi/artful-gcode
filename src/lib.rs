@@ -74,6 +74,7 @@ impl Printer {
             height:   maxy - miny,
             scale:    None,
             commands: Vec::new(),
+            gcode:    Vec::new(),
         }.init()
     }
 
