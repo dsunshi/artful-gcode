@@ -1,7 +1,7 @@
 
-use std::io::prelude::*;
-use std::fs::File;
 use std::fmt;
+use std::fs::File;
+use std::io::prelude::*;
 
 const G_MODE:  u32 = 0;
 const Z_RESET: f32 = 80.0;
@@ -79,6 +79,16 @@ fn write_code(f: &mut File, c: Code) {
     _ = f.write_all("\n".as_bytes());
 }
 
+fn render_move(point: &Point, feed: &f32) -> String {
+    let point_str = point.to_string();
+
+    if point_str.len() == 0 {
+        Code::Comment("[WARNING] Move without coordinates!".to_string()).to_string()
+    } else {
+        format!("G{} {} F{:.1}", G_MODE, point_str, feed)
+    }
+}
+
 impl fmt::Display for Point {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let x = render_coord('X', self.x);
@@ -98,16 +108,6 @@ impl fmt::Display for Point {
         };
 
         write!(f, "{}{}{}{}{}", x, x_space, y, y_space, z)
-    }
-}
-
-fn render_move(point: &Point, feed: &f32) -> String {
-    let point_str = point.to_string();
-
-    if point_str.len() == 0 {
-        Code::Comment("[WARNING] Move without coordinates!".to_string()).to_string()
-    } else {
-        format!("G{} {} F{:.1}", G_MODE, point_str, feed)
     }
 }
 
