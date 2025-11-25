@@ -81,6 +81,7 @@ fn render_coord(axis: char, v: Option<f32>) -> String {
 }
 
 fn write_code(f: &mut File, c: Code) {
+    // TODO: What to do in case of error
     _ = f.write_all(c.to_string().as_bytes());
     _ = f.write_all("\n".as_bytes());
 }
@@ -214,10 +215,10 @@ impl Printer {
 
             if count % skip == 0 {
                 let percent: f32 = ((count as f32) / (self.code.len() as f32)) * 100.0;
-                write_code(&mut file, Code::Comment(format!("{:.1}%", percent)));
+                write_code(&mut file, Code::Message(format!("{:.1}%", percent)));
             }
 
-            count += 1;
+            count = count + 1;
         }
         
         for c in footer {
@@ -291,5 +292,25 @@ mod tests {
         let mut printer = Printer::new(config);
         printer.draw_point(50.0, 50.0);
         printer.save("simple_example.gcode");
+    }
+    
+    #[test]
+    fn progress_example() {
+        let config: PrinterConfig = PrinterConfig {
+            model: Some(Code::Model("MK3S".to_string())),
+            min:   (50.0,  35.0),
+            max:   (254.0, 212.0),
+            scale: None,
+            z0:       6.5,
+            z_plunge: 4.0,
+            move_speed:    1000.0,
+            plunge_speed:  500.0,
+            retract_speed: 800.0
+        };
+        let mut printer = Printer::new(config);
+        for _i in 0..10000 {
+            printer.draw_point(50.0, 50.0);
+        }
+        printer.save("progress.gcode");
     }
 } 
