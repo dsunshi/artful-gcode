@@ -71,6 +71,40 @@ const ABS_COORD: Code  = raw!("G90",       "Use absolute coordinates");
 const SET_ORIGIN: Code = raw!("G92 X0 Y0", "Set current position to origin");
 const OFF: Code        = raw!("M84",       "Disable motors");
 
+fn delta_point(a: &Point, b: &Point) -> f32 {
+    let delta_x = if let Some(ax) = a.x {
+        if let Some(bx) = b.x {
+            ax - bx
+        } else {
+            0.0
+        }
+    } else {
+        0.0
+    };
+    
+    let delta_y = if let Some(ay) = a.y {
+        if let Some(by) = b.y {
+            ay - by
+        } else {
+            0.0
+        }
+    } else {
+        0.0
+    };
+    
+    let delta_z = if let Some(az) = a.z {
+        if let Some(bz) = b.z {
+            az - bz
+        } else {
+            0.0
+        }
+    } else {
+        0.0
+    };
+
+    ((delta_x).powf(2.0) + (delta_y).powf(2.0) + (delta_z).powf(2.0)).sqrt()
+}
+
 fn rescale(m: f32, rmin: f32, rmax: f32, tmin: f32, tmax: f32) -> f32 {
     ((m - rmin) / (rmax - rmin)) * (tmax - tmin) + tmin
 }
@@ -176,41 +210,20 @@ impl Printer {
     }
 
     fn calc_total_time(&self) -> f32 {
-        let mut pos_x = self.config.min.0;
-        let mut pos_y = self.config.min.1;
-        let mut pos_z = self.config.z0;
         let mut total_dist = 0.0;
+
+        let mut curr_point = Point {
+            x: Some(self.config.min.0),
+            y: Some(self.config.min.1),
+            z: Some(self.config.z0) };
         
         for c in &self.code {
 
-            if let Code::Move(p, f) = c {
-                let speed_scale = f / MAX_FEED;
+            if let Code::Move(p, _) = c {
 
-                let dx = if let Some(px) = p.x {
-                    pos_x - px
-                } else {
-                    0.0
-                };
-
-                let dy = if let Some(py) = p.y {
-                    pos_y - py
-                } else {
-                    0.0
-                };
-
-                let dz = if let Some(pz) = p.z {
-                    pos_z - pz
-                } else {
-                    0.0
-                };
-
-                total_dist += dx / speed_scale;
-                total_dist += dy / speed_scale;
-                total_dist += dz / speed_scale;
-
-                pos_x += dx;
-                pos_y += dy;
-                pos_z += dz;
+                let dist = delta_point(&curr_point, &p);
+                total_dist += dist;
+                curr_point = *p;
             }
 
         }
@@ -366,5 +379,25 @@ mod tests {
             printer.draw_point(50.0, 50.0);
         }
         printer.save("progress.gcode");
+    }
+    
+    #[test]
+    fn speed_example() {
+        let config: PrinterConfig = PrinterConfig {
+            model: Some(Code::Model("MK3S".to_string())),
+            min:   (50.0,  35.0),
+            max:   (254.0, 212.0),
+            scale: None,
+            z0:       6.5,
+            z_plunge: 4.0,
+            move_speed:    1000.0,
+            plunge_speed:  500.0,
+            retract_speed: 800.0
+        };
+        let mut printer = Printer::new(config);
+        for i in 0..1000 {
+            printer.draw_point(i as f32, i as f32);
+        }
+        printer.save("speed.gcode");
     }
 } 
