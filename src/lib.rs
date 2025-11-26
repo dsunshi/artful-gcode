@@ -7,7 +7,7 @@ const G_MODE:  u32 = 0;
 const Z_RESET: f32 = 80.0;
 
 const SPEED: f32 = 200.0;
-const MAX_FEED: f32 = 1000.0;
+const _MAX_FEED: f32 = 1000.0;
 
 #[derive(Debug, Clone)]
 pub struct Source {
@@ -81,7 +81,7 @@ fn delta_point(a: &Point, b: &Point) -> f32 {
     } else {
         0.0
     };
-    
+
     let delta_y = if let Some(ay) = a.y {
         if let Some(by) = b.y {
             ay - by
@@ -91,7 +91,7 @@ fn delta_point(a: &Point, b: &Point) -> f32 {
     } else {
         0.0
     };
-    
+
     let delta_z = if let Some(az) = a.z {
         if let Some(bz) = b.z {
             az - bz
@@ -144,7 +144,7 @@ impl fmt::Display for Point {
         } else {
             ""
         };
-        
+
         let y_space = if y.len() > 0 && z.len() > 0 {
             " "
         } else {
@@ -216,7 +216,7 @@ impl Printer {
             x: Some(self.config.min.0),
             y: Some(self.config.min.1),
             z: Some(self.config.z0) };
-        
+
         for c in &self.code {
 
             if let Code::Move(p, _) = c {
@@ -255,7 +255,7 @@ impl Printer {
         header.push(ABS_COORD);
         header.push(HOME);
         header.push(Code::NOP);
-        
+
         header.push(Code::Move(Point{
             x: Some(self.config.min.0),
             y: Some(self.config.min.1),
@@ -264,7 +264,7 @@ impl Printer {
         header.push(SET_ORIGIN);
         header.push(Code::Message("0.0%".to_string()));
         header.push(Code::NOP);
-        
+
         // footer
         footer.push(Code::Comment("Lift the head up before turning off".to_string()));
         footer.push(Code::Move(Point{
@@ -296,7 +296,7 @@ impl Printer {
 
             count = count + 1;
         }
-        
+
         for c in footer {
             write_code(&mut file, c);
         }
@@ -311,11 +311,11 @@ mod tests {
     fn code_mesage() {
         let c: Code = Code::Message("Hello".to_owned());
         assert_eq!(c.to_string(), "M117 Hello");
-        
+
         let c: Code = Code::Message(format!("{:.1}%", 50.3));
         assert_eq!(c.to_string(), "M117 50.3%");
     }
-    
+
     #[test]
     fn code_model() {
         let c: Code = Code::Model("MK3S".to_owned());
@@ -327,11 +327,11 @@ mod tests {
         let p = Point{x: None, y: None, z: None};
         let c: Code = Code::Move(p, 1000.0);
         assert_eq!(c.to_string(), "; [WARNING] Move without coordinates!");
-        
+
         let p = Point{x: Some(0.0), y: None, z: None};
         let c: Code = Code::Move(p, 1000.0);
         assert_eq!(c.to_string(), format!("G{} X0.0 F1000.0", G_MODE));
-        
+
         let p = Point{x: Some(0.0), y: Some(1.0), z: None};
         let c: Code = Code::Move(p, 1000.0);
         assert_eq!(c.to_string(), format!("G{} X0.0 Y1.0 F1000.0", G_MODE));
@@ -343,7 +343,7 @@ mod tests {
         let p = Point{x: Some(0.0), y: None, z: Some(2.0)};
         let c: Code = Code::Move(p, 1000.0);
         assert_eq!(c.to_string(), format!("G{} X0.0 Z2.0 F1000.0", G_MODE));
-        
+
         let p = Point{x: None, y: None, z: Some(2.0)};
         let c: Code = Code::Move(p, 1000.0);
         assert_eq!(c.to_string(), format!("G{} Z2.0 F1000.0", G_MODE));
@@ -370,7 +370,7 @@ mod tests {
         printer.draw_point(50.0, 50.0);
         printer.save("simple_example.gcode");
     }
-    
+
     #[test]
     fn progress_example() {
         let config: PrinterConfig = PrinterConfig {
@@ -390,7 +390,7 @@ mod tests {
         }
         printer.save("progress.gcode");
     }
-    
+
     #[test]
     fn speed_example() {
         let config: PrinterConfig = PrinterConfig {
