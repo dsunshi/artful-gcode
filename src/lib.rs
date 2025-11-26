@@ -223,7 +223,17 @@ impl Printer {
 
                 let dist = delta_point(&curr_point, &p);
                 total_dist += dist;
-                curr_point = *p;
+
+                if p.x.is_some() {
+                    curr_point.x = p.x;
+                }
+                if p.y.is_some() {
+                    curr_point.y = p.y;
+                }
+                if p.z.is_some() {
+                    curr_point.z = p.z;
+                }
+                // curr_point = *p;
             }
 
         }
