@@ -6,7 +6,7 @@ pin_hole = 16;
 t = 1.5;
 d = 25;
 
-PENCIL = 8;
+//PENCIL = 8;
 PEN    = 11.5;
 
 pencil_d = PEN;
@@ -37,6 +37,23 @@ module pencil_holder() {
         }
         translate([0, 0, -tp])
         cylinder(h = nema_17_size + 2 * tp, d = pencil_d, $fn = 33);
+        //translate([0, 0, h/2])
+        //rotate([90, 0, 0])
+        //cylinder(h = pencil_hole_l + pencil_d, d = pencil_hole_d, $fn = 33);
+    }
+}
+
+module pencil_clip() {
+    h = 10;
+    tp = pencil_hole_l;
+    difference() {
+        union() {
+            cylinder(h = h, d = pencil_d + 2 * tp, $fn = 33);
+            //translate([-(pencil_d + 2 * tp)/2, 0, 0])
+            //#cube([pencil_d + 2 * tp, pencil_d + tp, h]);
+        }
+        translate([0, 0, -tp])
+        cylinder(h = nema_17_size + 2 * tp, d = pencil_d, $fn = 33);
         translate([0, 0, h/2])
         rotate([90, 0, 0])
         cylinder(h = pencil_hole_l + pencil_d, d = pencil_hole_d, $fn = 33);
@@ -46,3 +63,6 @@ module pencil_holder() {
 pencil_holder();
 translate([-d/2, pencil_d + pencil_hole_l, 0])
 motor_mount();
+
+translate([100, 100, 0])
+pencil_clip();
