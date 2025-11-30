@@ -2,6 +2,7 @@
 use std::fmt;
 use std::fs::File;
 use std::io::prelude::*;
+use std::cmp;
 
 const G_MODE:  u32 = 0;
 const Z_RESET: f32 = 80.0;
@@ -292,8 +293,8 @@ impl Printer {
         }
 
         let mut count = 1;
-        // TODO: Configurable?
-        let skip = 100;
+        let skip = cmp::max(((self.code.len() as f32) * 0.015) as u32, 5); // 5 number of commands
+                                                                           // in draw_point
         let total_time = Self::calc_total_time(self) as u32;
         for c in &self.code {
             write_code(&mut file, c.clone());
@@ -305,7 +306,8 @@ impl Printer {
                 let minutes = (total_seconds % 3600) / 60;
                 let seconds = total_seconds % 60;
 
-                write_code(&mut file, Code::Message(format!("{:.1}% R{:02}:{:02}:{:02}", percent * 100.0, hours, minutes, seconds)));
+                write_code(&mut file, Code::Message(
+                        format!("{:.1}% R{:02}:{:02}:{:02}", percent * 100.0, hours, minutes, seconds)));
             }
 
             count = count + 1;
