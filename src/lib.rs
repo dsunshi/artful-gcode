@@ -219,11 +219,11 @@ impl Printer {
         }
 
         self.code.push(Code::Comment(format!("draw_point({:.1}, {:.1})", xp, yp)));
-        // self.code.push(Code::Move(Point{x: Some(x), y: Some(y), z: None},                       self.config.move_speed));
-        // self.code.push(Code::Move(Point{x: None,    y: None,    z: Some(self.config.z_plunge)}, self.config.plunge_speed));
-        // self.code.push(Code::Move(Point{x: None,    y: None,    z: Some(self.config.z0)},       self.config.retract_speed));
+        // -> (x, y)
         self.code.push(xy!(x, y, self.config.move_speed));
+        // z down
         self.code.push(z!(self.config.z_plunge, self.config.plunge_speed));
+        // z up
         self.code.push(z!(self.config.z0, self.config.retract_speed));
         self.code.push(Code::NOP);
     }
@@ -252,7 +252,6 @@ impl Printer {
                 if p.z.is_some() {
                     curr_point.z = p.z;
                 }
-                // curr_point = *p;
             }
 
         }
@@ -275,11 +274,7 @@ impl Printer {
         header.push(HOME);
         header.push(Code::NOP);
 
-        // header.push(Code::Move(Point{
-        //     x: Some(self.config.min.0),
-        //     y: Some(self.config.min.1),
-        //     z: Some(self.config.z0)},
-        //     self.config.move_speed));
+        // Z first so we don't scrape the print area
         header.push(z!(self.config.z0, self.config.move_speed));
         header.push(xy!(self.config.min.0, self.config.min.1, self.config.move_speed));
         header.push(SET_ORIGIN);
@@ -289,9 +284,6 @@ impl Printer {
         // footer
         footer.push(Code::Comment("Lift the head up before turning off".to_string()));
         footer.push(z!(Z_RESET, self.config.move_speed));
-        // footer.push(Code::Move(Point{
-        //     x: None, y: None, z: Some(Z_RESET)},
-        //     self.config.move_speed));
         footer.push(OFF);
         footer.push(Code::NOP);
 
@@ -300,7 +292,7 @@ impl Printer {
         }
 
         let mut count = 1;
-        // TODO: Configurable
+        // TODO: Configurable?
         let skip = 100;
         let total_time = Self::calc_total_time(self) as u32;
         for c in &self.code {
@@ -432,4 +424,5 @@ mod tests {
         }
         printer.save("speed.gcode");
     }
-} 
+}
+
