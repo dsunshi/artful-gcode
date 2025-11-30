@@ -52,6 +52,22 @@ pub struct Printer {
     pub height: f32,
 }
 
+macro_rules! xy{
+    ($a: expr, $b: expr, $c: expr) => {
+        {
+            Code::Move(Point{x: Some($a), y: Some($b), z: None}, $c)
+        }
+    }
+}
+
+macro_rules! z{
+    ($a: expr, $b: expr) => {
+        {
+            Code::Move(Point{x: None, y: None, z: Some($a)}, $b)
+        }
+    }
+}
+
 macro_rules! raw{
     ($a: expr, $b: expr) => {
         {
@@ -203,9 +219,12 @@ impl Printer {
         }
 
         self.code.push(Code::Comment(format!("draw_point({:.1}, {:.1})", xp, yp)));
-        self.code.push(Code::Move(Point{x: Some(x), y: Some(y), z: None},                       self.config.move_speed));
-        self.code.push(Code::Move(Point{x: None,    y: None,    z: Some(self.config.z_plunge)}, self.config.plunge_speed));
-        self.code.push(Code::Move(Point{x: None,    y: None,    z: Some(self.config.z0)},       self.config.retract_speed));
+        // self.code.push(Code::Move(Point{x: Some(x), y: Some(y), z: None},                       self.config.move_speed));
+        // self.code.push(Code::Move(Point{x: None,    y: None,    z: Some(self.config.z_plunge)}, self.config.plunge_speed));
+        // self.code.push(Code::Move(Point{x: None,    y: None,    z: Some(self.config.z0)},       self.config.retract_speed));
+        self.code.push(xy!(x, y, self.config.move_speed));
+        self.code.push(z!(self.config.z_plunge, self.config.plunge_speed));
+        self.code.push(z!(self.config.z0, self.config.retract_speed));
         self.code.push(Code::NOP);
     }
 
@@ -256,22 +275,25 @@ impl Printer {
         header.push(HOME);
         header.push(Code::NOP);
 
-        header.push(Code::Move(Point{
-            x: Some(self.config.min.0),
-            y: Some(self.config.min.1),
-            z: Some(self.config.z0)},
-            self.config.move_speed));
+        // header.push(Code::Move(Point{
+        //     x: Some(self.config.min.0),
+        //     y: Some(self.config.min.1),
+        //     z: Some(self.config.z0)},
+        //     self.config.move_speed));
+        header.push(z!(self.config.z0, self.config.move_speed));
+        header.push(xy!(self.config.min.0, self.config.min.1, self.config.move_speed));
         header.push(SET_ORIGIN);
         header.push(Code::Message("0.0%".to_string()));
         header.push(Code::NOP);
 
         // footer
         footer.push(Code::Comment("Lift the head up before turning off".to_string()));
-        footer.push(Code::Move(Point{
-            x: None, y: None, z: Some(Z_RESET)},
-            self.config.move_speed));
+        footer.push(z!(Z_RESET, self.config.move_speed));
+        // footer.push(Code::Move(Point{
+        //     x: None, y: None, z: Some(Z_RESET)},
+        //     self.config.move_speed));
         footer.push(OFF);
-        header.push(Code::NOP);
+        footer.push(Code::NOP);
 
         for c in header {
             write_code(&mut file, c);
