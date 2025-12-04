@@ -199,9 +199,9 @@ impl Printer {
         self.code.push(Code::Comment(format!("draw_point({:.1}, {:.1})", xp, yp)));
         // -> (x, y)
         self.code.push(xy!(x, y, self.config.move_speed));
-        // z down
+        // pen down
         self.code.push(z!(self.config.z_plunge, self.config.plunge_speed));
-        // z up
+        // pen up
         self.code.push(z!(self.config.z0, self.config.retract_speed));
         self.code.push(Code::NOP);
     }
@@ -209,21 +209,15 @@ impl Printer {
     fn total_dist(&self) -> f32 {
         let mut total_dist = 0.0;
 
-        // let mut curr_point = Point {
-        //     x: Some(self.config.min.0),
-        //     y: Some(self.config.min.1),
-        //     z: Some(self.config.z0) };
         let mut curr_point = Point {
             x: Some(0.0),
             y: Some(0.0),
-            z: Some(0.0)};
+            z: Some(self.config.z0) };
 
         for c in &self.code {
 
             if let Code::Move(p, _) = c {
-
-                let dist    = delta_point(&curr_point, &p);
-                total_dist += dist;
+                total_dist  += delta_point(&curr_point, &p);
 
                 curr_point.x = p.x.or(curr_point.x);
                 curr_point.y = p.y.or(curr_point.y);
@@ -427,7 +421,7 @@ mod tests {
         // let expected = 99.0 + (2.0 * (2.0 * (config.z0 - config.z_plunge)));
         let expected = 99.0 + (2.0 * (2.0 * (6.5 - 4.0)));
         let actual = printer.total_dist();
-        assert_within(actual, expected, 2.0);
+        assert_within(actual, expected, 0.01);
     }
 }
 
