@@ -7,7 +7,7 @@ use std::cmp;
 const G_MODE:  u32 = 0;
 const Z_RESET: f32 = 80.0;
 
-const SPEED: f32 = 200.0;
+const SPEED: f32 = 10.0;
 const _MAX_FEED: f32 = 1000.0;
 
 #[derive(Debug, Clone)]
