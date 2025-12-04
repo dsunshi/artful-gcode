@@ -88,36 +88,18 @@ const ABS_COORD: Code  = raw!("G90",       "Use absolute coordinates");
 const SET_ORIGIN: Code = raw!("G92 X0 Y0", "Set current position to origin");
 const OFF: Code        = raw!("M84",       "Disable motors");
 
+fn assert_within(a: f32, b: f32, n: f32) {
+    if (a - b).abs() >= n {
+        panic!("The difference between {} and {} is more than {}!", a, b, n);
+    }
+}
+
 fn delta_point(a: &Point, b: &Point) -> f32 {
-    let delta_x = if let Some(ax) = a.x {
-        if let Some(bx) = b.x {
-            ax - bx
-        } else {
-            0.0
-        }
-    } else {
-        0.0
-    };
+    let diff = |a: f32, b: f32| -> f32 { a - b };
 
-    let delta_y = if let Some(ay) = a.y {
-        if let Some(by) = b.y {
-            ay - by
-        } else {
-            0.0
-        }
-    } else {
-        0.0
-    };
-
-    let delta_z = if let Some(az) = a.z {
-        if let Some(bz) = b.z {
-            az - bz
-        } else {
-            0.0
-        }
-    } else {
-        0.0
-    };
+    let delta_x = a.x.zip(b.x).map(|(x, y)| diff(x, y)).unwrap_or(0.0);
+    let delta_y = a.y.zip(b.y).map(|(x, y)| diff(x, y)).unwrap_or(0.0);
+    let delta_z = a.z.zip(b.z).map(|(x, y)| diff(x, y)).unwrap_or(0.0);
 
     ((delta_x).powf(2.0) + (delta_y).powf(2.0) + (delta_z).powf(2.0)).sqrt()
 }
@@ -229,35 +211,33 @@ impl Printer {
         self.code.push(Code::NOP);
     }
 
-    fn calc_total_time(&self) -> f32 {
+    fn total_dist(&self) -> f32 {
         let mut total_dist = 0.0;
 
+        // let mut curr_point = Point {
+        //     x: Some(self.config.min.0),
+        //     y: Some(self.config.min.1),
+        //     z: Some(self.config.z0) };
         let mut curr_point = Point {
-            x: Some(self.config.min.0),
-            y: Some(self.config.min.1),
-            z: Some(self.config.z0) };
+            x: Some(0.0),
+            y: Some(0.0),
+            z: Some(0.0)};
 
         for c in &self.code {
 
             if let Code::Move(p, _) = c {
 
-                let dist = delta_point(&curr_point, &p);
+                let dist    = delta_point(&curr_point, &p);
                 total_dist += dist;
 
-                if p.x.is_some() {
-                    curr_point.x = p.x;
-                }
-                if p.y.is_some() {
-                    curr_point.y = p.y;
-                }
-                if p.z.is_some() {
-                    curr_point.z = p.z;
-                }
+                curr_point.x = p.x.or(curr_point.x);
+                curr_point.y = p.y.or(curr_point.y);
+                curr_point.z = p.z.or(curr_point.z);
             }
 
         }
 
-        total_dist / SPEED // Should be approx. the number of seconds this will take to print
+        total_dist
     }
 
     pub fn save(&self, filename: &str) {
@@ -295,7 +275,7 @@ impl Printer {
         let mut count = 1;
         let skip = cmp::max(((self.code.len() as f32) * 0.015) as u32, 5); // 5 number of commands
                                                                            // in draw_point
-        let total_time = Self::calc_total_time(self) as u32;
+        let total_time = (Self::total_dist(self) / SPEED) as u32;
         for c in &self.code {
             write_code(&mut file, c.clone());
 
@@ -425,6 +405,28 @@ mod tests {
             printer.draw_point(i as f32, i as f32);
         }
         printer.save("speed.gcode");
+    }
+
+    #[test]
+    fn dist_test() {
+        let config: PrinterConfig = PrinterConfig {
+            model: Some(Code::Model("MK3S".to_string())),
+            min:   (50.0,  35.0),
+            max:   (254.0, 212.0),
+            scale: None,
+            z0:       6.5,
+            z_plunge: 4.0,
+            move_speed:    1000.0,
+            plunge_speed:  500.0,
+            retract_speed: 800.0
+        };
+        let mut printer = Printer::new(config);
+        printer.draw_point(50.0, 49.0);
+        printer.draw_point(29.0, 29.0);
+        // let expected = 99.0 + (2.0 * (2.0 * (config.z0 - config.z_plunge)));
+        let expected = 99.0 + (2.0 * (2.0 * (6.5 - 4.0)));
+        let actual = printer.total_dist();
+        assert_within(actual, expected, 2.0);
     }
 }
 
