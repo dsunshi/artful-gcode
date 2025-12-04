@@ -88,11 +88,6 @@ const ABS_COORD: Code  = raw!("G90",       "Use absolute coordinates");
 const SET_ORIGIN: Code = raw!("G92 X0 Y0", "Set current position to origin");
 const OFF: Code        = raw!("M84",       "Disable motors");
 
-fn assert_within(a: f32, b: f32, n: f32) {
-    if (a - b).abs() >= n {
-        panic!("The difference between {} and {} is more than {}!", a, b, n);
-    }
-}
 
 fn delta_point(a: &Point, b: &Point) -> f32 {
     let diff = |a: f32, b: f32| -> f32 { a - b };
@@ -302,6 +297,12 @@ impl Printer {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn assert_within(a: f32, b: f32, n: f32) {
+        if (a - b).abs() >= n {
+            panic!("The difference between {} and {} is more than {}!", a, b, n);
+        }
+    }
 
     #[test]
     fn code_mesage() {
