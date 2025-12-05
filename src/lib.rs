@@ -244,11 +244,11 @@ impl Printer {
 
     pub fn save(&self, filename: &str) {
         // TODO: Need to return actual Result
+        // TODO: Return error if self.code.len() == 0?
         let mut file = File::create(filename).unwrap();
         let mut header: Vec<Code> = Vec::new();
         let mut footer: Vec<Code> = Vec::new();
 
-        // Header
         header.push(Code::Comment("Start of generated code".to_string()));
         if let Some(model) = &self.config.model {
             // TODO: Can we remove this clone?
@@ -259,14 +259,13 @@ impl Printer {
         header.push(HOME);
         header.push(Code::NOP);
 
-        // Up first so we don't scrape the print area
+        // Move z first so we don't scrape the print area!
         header.push(z!(self.config.z0, self.config.xy_speed));
         header.push(xy!(self.config.min.0, self.config.min.1, self.config.xy_speed));
         header.push(SET_ORIGIN);
         header.push(Code::Message("0.0%".to_string()));
         header.push(Code::NOP);
 
-        // Footer
         footer.push(Code::Comment("Lift the head up before turning off".to_string()));
         footer.push(z!(Z_RESET, self.config.xy_speed));
         footer.push(OFF);
@@ -276,6 +275,7 @@ impl Printer {
             write_code(&mut file, c);
         }
 
+        // TODO: Can we skip based on time instead?
         let mut count = 1;
         let skip = cmp::max(((self.code.len() as f32) * 0.015) as u32, 5); // 5 number of commands
                                                                            // in draw_point
@@ -292,7 +292,8 @@ impl Printer {
                 let seconds = total_seconds % 60;
 
                 write_code(&mut file, Code::Message(
-                        format!("{:.1}% R{:02}:{:02}:{:02}", percent * 100.0, hours, minutes, seconds)));
+                        format!("{:.1}% R{:02}:{:02}:{:02}", percent * 100.0, hours, minutes, seconds))
+                );
             }
 
             count = count + 1;
