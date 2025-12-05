@@ -1,8 +1,9 @@
 
+use std::cmp;
 use std::fmt;
 use std::fs::File;
 use std::io::prelude::*;
-use std::cmp;
+use std::io;
 
 const G_MODE:  u32 = 0;
 const Z_RESET: f32 = 80.0;
@@ -100,10 +101,10 @@ fn render_coord(axis: char, v: Option<f32>) -> String {
     }
 }
 
-fn write_code(f: &mut File, c: Code) {
-    // TODO: What to do in case of error
-    _ = f.write_all(c.to_string().as_bytes());
-    _ = f.write_all("\n".as_bytes());
+fn write_code(f: &mut File, c: Code) -> Result<(), io::Error> {
+    f.write_all(c.to_string().as_bytes())?;
+    f.write_all("\n".as_bytes())?;
+    Ok(())
 }
 
 fn render_move(point: &Point, feed: &f32) -> String {
@@ -242,10 +243,10 @@ impl Printer {
         total_dist
     }
 
-    pub fn save(&self, filename: &str) {
+    pub fn save(&self, filename: &str) -> Result<(), io::Error> {
         // TODO: Need to return actual Result
         // TODO: Return error if self.code.len() == 0?
-        let mut file = File::create(filename).unwrap();
+        let mut file = File::create(filename)?;
         let mut header: Vec<Code> = Vec::new();
         let mut footer: Vec<Code> = Vec::new();
 
@@ -272,7 +273,7 @@ impl Printer {
         footer.push(Code::NOP);
 
         for c in header {
-            write_code(&mut file, c);
+            write_code(&mut file, c)?;
         }
 
         // TODO: Can we skip based on time instead?
@@ -282,7 +283,7 @@ impl Printer {
         let total_time = (Self::total_dist(self) / SPEED) as u32;
         for c in &self.code {
             // TODO: Can we remove this clone?
-            write_code(&mut file, c.clone());
+            write_code(&mut file, c.clone())?;
 
             if count % skip == 0 {
                 let percent: f32 = (count as f32) / (self.code.len() as f32);
@@ -293,17 +294,18 @@ impl Printer {
 
                 write_code(&mut file, Code::Message(
                         format!("{:.1}% R{:02}:{:02}:{:02}", percent * 100.0, hours, minutes, seconds))
-                );
+                )?;
             }
 
             count = count + 1;
         }
 
         for c in footer {
-            write_code(&mut file, c);
+            write_code(&mut file, c)?;
         }
 
-        let _ = file.flush();
+        file.flush()?;
+        Ok(())
     }
 }
 
@@ -381,7 +383,9 @@ mod tests {
     fn simple_example() {
         let mut printer = Printer::new(test_config());
         printer.draw_point(50.0, 50.0);
-        printer.save("simple_example.gcode");
+        if let Err(e) = printer.save("simple.gcode") {
+            panic!("Unable to generate GCODE: {}", e);
+        }
     }
 
     #[test]
@@ -390,7 +394,9 @@ mod tests {
         for _i in 0..10000 {
             printer.draw_point(50.0, 50.0);
         }
-        printer.save("progress.gcode");
+        if let Err(e) = printer.save("progress.gcode") {
+            panic!("Unable to generate GCODE: {}", e);
+        }
     }
 
     #[test]
@@ -399,7 +405,9 @@ mod tests {
         for i in 0..1000 {
             printer.draw_point(i as f32, i as f32);
         }
-        printer.save("speed.gcode");
+        if let Err(e) = printer.save("speed.gcode") {
+            panic!("Unable to generate GCODE: {}", e);
+        }
     }
 
     #[test]
