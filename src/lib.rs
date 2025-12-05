@@ -88,7 +88,6 @@ const ABS_COORD: Code  = raw!("G90",       "Use absolute coordinates");
 const SET_ORIGIN: Code = raw!("G92 X0 Y0", "Set current position to origin");
 const OFF: Code        = raw!("M84",       "Disable motors");
 
-
 fn delta_point(a: &Point, b: &Point) -> f32 {
     let diff = |a: f32, b: f32| -> f32 { a - b };
 
@@ -388,7 +387,10 @@ mod tests {
         let mut printer = Printer::new(test_config());
         printer.draw_point(50.0, 49.0);
         printer.draw_point(29.0, 29.0);
-        // let expected = 99.0 + (2.0 * (2.0 * (config.z0 - config.z_plunge)));
+        // 99.0 is the distance from (0, 0) to (50, 49) to (29, 29)
+        // Each point is drawn by going down then back up, i.e.:
+        //  2 * (z0 - z_plunge)
+        // We drew two points, so the total formula is:
         let expected = 99.0 + (2.0 * (2.0 * (6.5 - 4.0)));
         let actual = printer.total_dist();
         assert_within(actual, expected, 0.01);
