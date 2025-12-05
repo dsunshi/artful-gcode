@@ -40,10 +40,10 @@ pub struct PrinterConfig {
     pub max: (f32, f32),
     pub scale: Option<(f32, f32)>,
     pub z0: f32,
-    pub z_plunge: f32,
-    pub move_speed: f32,
-    pub plunge_speed: f32,
-    pub retract_speed: f32,
+    pub z_draw: f32,
+    pub xy_speed: f32,
+    pub down_speed: f32,
+    pub up_speed: f32,
 }
 
 pub struct Printer {
@@ -88,16 +88,6 @@ const ABS_COORD: Code  = raw!("G90",       "Use absolute coordinates");
 const SET_ORIGIN: Code = raw!("G92 X0 Y0", "Set current position to origin");
 const OFF: Code        = raw!("M84",       "Disable motors");
 
-fn delta_point(a: &Point, b: &Point) -> f32 {
-    let diff = |a: f32, b: f32| -> f32 { a - b };
-
-    let delta_x = a.x.zip(b.x).map(|(x, y)| diff(x, y)).unwrap_or(0.0);
-    let delta_y = a.y.zip(b.y).map(|(x, y)| diff(x, y)).unwrap_or(0.0);
-    let delta_z = a.z.zip(b.z).map(|(x, y)| diff(x, y)).unwrap_or(0.0);
-
-    ((delta_x).powf(2.0) + (delta_y).powf(2.0) + (delta_z).powf(2.0)).sqrt()
-}
-
 fn rescale(m: f32, rmin: f32, rmax: f32, tmin: f32, tmax: f32) -> f32 {
     ((m - rmin) / (rmax - rmin)) * (tmax - tmin) + tmin
 }
@@ -123,6 +113,19 @@ fn render_move(point: &Point, feed: &f32) -> String {
         Code::Comment("[WARNING] Move without coordinates!".to_string()).to_string()
     } else {
         format!("G{} {} F{:.1}", G_MODE, point_str, feed)
+    }
+}
+
+impl Point {
+    fn dist(&self, other: &Point) -> f32 {
+        let diff = |a: f32, b: f32| -> f32 { a - b };
+
+        // TODO: How to fold over entire Point?
+        let delta_x = self.x.zip(other.x).map(|(x, y)| diff(x, y)).unwrap_or(0.0);
+        let delta_y = self.y.zip(other.y).map(|(x, y)| diff(x, y)).unwrap_or(0.0);
+        let delta_z = self.z.zip(other.z).map(|(x, y)| diff(x, y)).unwrap_or(0.0);
+
+        ((delta_x).powf(2.0) + (delta_y).powf(2.0) + (delta_z).powf(2.0)).sqrt()
     }
 }
 
@@ -171,7 +174,6 @@ impl fmt::Display for Code {
     }
 }
 
-
 impl Printer {
 
     pub fn new(config: PrinterConfig) -> Self {
@@ -197,11 +199,11 @@ impl Printer {
 
         self.code.push(Code::Comment(format!("draw_point({:.1}, {:.1})", xp, yp)));
         // -> (x, y)
-        self.code.push(xy!(x, y, self.config.move_speed));
+        self.code.push(xy!(x, y, self.config.xy_speed));
         // pen down
-        self.code.push(z!(self.config.z_plunge, self.config.plunge_speed));
+        self.code.push(z!(self.config.z_draw, self.config.down_speed));
         // pen up
-        self.code.push(z!(self.config.z0, self.config.retract_speed));
+        self.code.push(z!(self.config.z0, self.config.up_speed));
         self.code.push(Code::NOP);
     }
 
@@ -211,12 +213,13 @@ impl Printer {
         let mut curr_point = Point {
             x: Some(0.0),
             y: Some(0.0),
-            z: Some(self.config.z0) };
+            z: Some(self.config.z0)
+        };
 
         for c in &self.code {
 
             if let Code::Move(p, _) = c {
-                total_dist  += delta_point(&curr_point, &p);
+                total_dist  += curr_point.dist(&p);
 
                 curr_point.x = p.x.or(curr_point.x);
                 curr_point.y = p.y.or(curr_point.y);
@@ -233,7 +236,7 @@ impl Printer {
         let mut header: Vec<Code> = Vec::new();
         let mut footer: Vec<Code> = Vec::new();
 
-        // header
+        // Header
         header.push(Code::Comment("Start of generated code".to_string()));
         if let Some(model) = &self.config.model {
             header.push(model.clone());
@@ -243,16 +246,16 @@ impl Printer {
         header.push(HOME);
         header.push(Code::NOP);
 
-        // Z first so we don't scrape the print area
-        header.push(z!(self.config.z0, self.config.move_speed));
-        header.push(xy!(self.config.min.0, self.config.min.1, self.config.move_speed));
+        // Up first so we don't scrape the print area
+        header.push(z!(self.config.z0, self.config.xy_speed));
+        header.push(xy!(self.config.min.0, self.config.min.1, self.config.xy_speed));
         header.push(SET_ORIGIN);
         header.push(Code::Message("0.0%".to_string()));
         header.push(Code::NOP);
 
-        // footer
+        // Footer
         footer.push(Code::Comment("Lift the head up before turning off".to_string()));
-        footer.push(z!(Z_RESET, self.config.move_speed));
+        footer.push(z!(Z_RESET, self.config.xy_speed));
         footer.push(OFF);
         footer.push(Code::NOP);
 
@@ -293,15 +296,15 @@ mod tests {
 
     fn test_config() -> PrinterConfig {
         PrinterConfig {
-            model: Some(Code::Model("MK3S".to_string())),
-            min:   (50.0,  35.0),
-            max:   (254.0, 212.0),
-            scale: None,
-            z0:       6.5,
-            z_plunge: 4.0,
-            move_speed:    1000.0,
-            plunge_speed:  500.0,
-            retract_speed: 800.0
+            model:      Some(Code::Model("MK3S".to_string())), // Printer model check
+            min:       (50.0,  35.0),  // Smallest possible printer (x, y) position
+            max:       (254.0, 212.0), // Largest possible printer (x, y) position
+            scale:      None,          // Original scale to resize based on min and max
+            z0:         6.5,           // z position where the printer can freely move along xy-axis
+            z_draw:     4.0,           // z position where pen meets paper
+            xy_speed:   1000.0,        // Speed when moving through the 2D xy-plane with pen up
+            down_speed: 500.0,         // Speed when lowering the pen (z0 -> z_draw)
+            up_speed:   800.0          // Speed when raising the pen (z_draw -> z0)
         }
     }
 
@@ -389,7 +392,7 @@ mod tests {
         printer.draw_point(29.0, 29.0);
         // 99.0 is the distance from (0, 0) to (50, 49) to (29, 29)
         // Each point is drawn by going down then back up, i.e.:
-        //  2 * (z0 - z_plunge)
+        //  2 * (z0 - z_draw)
         // We drew two points, so the total formula is:
         let expected = 99.0 + (2.0 * (2.0 * (6.5 - 4.0)));
         let actual = printer.total_dist();
