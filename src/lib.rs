@@ -174,10 +174,19 @@ impl fmt::Display for Code {
     }
 }
 
+impl fmt::Display for Printer {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "")
+    }
+}
+
 impl Printer {
 
     pub fn new(config: PrinterConfig) -> Self {
+        // TODO: Check if the config is valid?
+        // - is z0 > z_draw?
         Printer {
+            // TODO: Can we remove this clone?
             config: config.clone(),
             code:   Vec::new(),
             width:  config.max.0 - config.min.0,
@@ -196,6 +205,8 @@ impl Printer {
             x = xp;
             y = yp;
         }
+
+        // TODO: What to do if x, y are outside the defined print area?
 
         self.code.push(Code::Comment(format!("draw_point({:.1}, {:.1})", xp, yp)));
         // -> (x, y)
@@ -232,6 +243,7 @@ impl Printer {
     }
 
     pub fn save(&self, filename: &str) {
+        // TODO: Need to return actual Result
         let mut file = File::create(filename).unwrap();
         let mut header: Vec<Code> = Vec::new();
         let mut footer: Vec<Code> = Vec::new();
@@ -239,6 +251,7 @@ impl Printer {
         // Header
         header.push(Code::Comment("Start of generated code".to_string()));
         if let Some(model) = &self.config.model {
+            // TODO: Can we remove this clone?
             header.push(model.clone());
         }
         header.push(UNITS_MM);
@@ -268,6 +281,7 @@ impl Printer {
                                                                            // in draw_point
         let total_time = (Self::total_dist(self) / SPEED) as u32;
         for c in &self.code {
+            // TODO: Can we remove this clone?
             write_code(&mut file, c.clone());
 
             if count % skip == 0 {
@@ -287,6 +301,8 @@ impl Printer {
         for c in footer {
             write_code(&mut file, c);
         }
+
+        let _ = file.flush();
     }
 }
 
