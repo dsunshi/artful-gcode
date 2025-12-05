@@ -292,6 +292,20 @@ impl Printer {
 mod tests {
     use super::*;
 
+    fn test_config() -> PrinterConfig {
+        PrinterConfig {
+            model: Some(Code::Model("MK3S".to_string())),
+            min:   (50.0,  35.0),
+            max:   (254.0, 212.0),
+            scale: None,
+            z0:       6.5,
+            z_plunge: 4.0,
+            move_speed:    1000.0,
+            plunge_speed:  500.0,
+            retract_speed: 800.0
+        }
+    }
+
     fn assert_within(a: f32, b: f32, n: f32) {
         if (a - b).abs() >= n {
             panic!("The difference between {} and {} is more than {}!", a, b, n);
@@ -346,36 +360,14 @@ mod tests {
 
     #[test]
     fn simple_example() {
-        let config: PrinterConfig = PrinterConfig {
-            model: Some(Code::Model("MK3S".to_string())),
-            min:   (50.0,  35.0),
-            max:   (254.0, 212.0),
-            scale: None,
-            z0:       6.5,
-            z_plunge: 4.0,
-            move_speed:    1000.0,
-            plunge_speed:  500.0,
-            retract_speed: 800.0
-        };
-        let mut printer = Printer::new(config);
+        let mut printer = Printer::new(test_config());
         printer.draw_point(50.0, 50.0);
         printer.save("simple_example.gcode");
     }
 
     #[test]
     fn progress_example() {
-        let config: PrinterConfig = PrinterConfig {
-            model: Some(Code::Model("MK3S".to_string())),
-            min:   (50.0,  35.0),
-            max:   (254.0, 212.0),
-            scale: None,
-            z0:       6.5,
-            z_plunge: 4.0,
-            move_speed:    1000.0,
-            plunge_speed:  500.0,
-            retract_speed: 800.0
-        };
-        let mut printer = Printer::new(config);
+        let mut printer = Printer::new(test_config());
         for _i in 0..10000 {
             printer.draw_point(50.0, 50.0);
         }
@@ -384,18 +376,7 @@ mod tests {
 
     #[test]
     fn speed_example() {
-        let config: PrinterConfig = PrinterConfig {
-            model: Some(Code::Model("MK3S".to_string())),
-            min:   (50.0,  35.0),
-            max:   (254.0, 212.0),
-            scale: None,
-            z0:       6.5,
-            z_plunge: 4.0,
-            move_speed:    1000.0,
-            plunge_speed:  500.0,
-            retract_speed: 800.0
-        };
-        let mut printer = Printer::new(config);
+        let mut printer = Printer::new(test_config());
         for i in 0..1000 {
             printer.draw_point(i as f32, i as f32);
         }
@@ -404,18 +385,7 @@ mod tests {
 
     #[test]
     fn dist_test() {
-        let config: PrinterConfig = PrinterConfig {
-            model: Some(Code::Model("MK3S".to_string())),
-            min:   (50.0,  35.0),
-            max:   (254.0, 212.0),
-            scale: None,
-            z0:       6.5,
-            z_plunge: 4.0,
-            move_speed:    1000.0,
-            plunge_speed:  500.0,
-            retract_speed: 800.0
-        };
-        let mut printer = Printer::new(config);
+        let mut printer = Printer::new(test_config());
         printer.draw_point(50.0, 49.0);
         printer.draw_point(29.0, 29.0);
         // let expected = 99.0 + (2.0 * (2.0 * (config.z0 - config.z_plunge)));
