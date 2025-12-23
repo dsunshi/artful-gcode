@@ -1,11 +1,10 @@
-
 use std::cmp;
 use std::fmt;
 use std::fs::File;
-use std::io::prelude::*;
 use std::io;
+use std::io::prelude::*;
 
-const G_MODE:  u32 = 0;
+const G_MODE: u32 = 0;
 const Z_RESET: f32 = 80.0;
 
 const SPEED: f32 = 10.0;
@@ -13,7 +12,7 @@ const _MAX_FEED: f32 = 1000.0;
 
 #[derive(Debug, Clone)]
 pub struct Source {
-    code:    &'static str,
+    code: &'static str,
     comment: Option<&'static str>,
 }
 
@@ -31,7 +30,7 @@ pub enum Code {
     Message(String),
     Move(Point, f32),
     Raw(Source),
-    NOP
+    NOP,
 }
 
 #[derive(Debug, Clone)]
@@ -50,44 +49,56 @@ pub struct PrinterConfig {
 pub struct Printer {
     config: PrinterConfig,
     code: Vec<Code>,
-    pub width:  f32,
+    pub width: f32,
     pub height: f32,
 }
 
-macro_rules! xy{
-    ($a: expr, $b: expr, $c: expr) => {
-        {
-            Code::Move(Point{x: Some($a), y: Some($b), z: None}, $c)
-        }
-    }
+macro_rules! xy {
+    ($a: expr, $b: expr, $c: expr) => {{
+        Code::Move(
+            Point {
+                x: Some($a),
+                y: Some($b),
+                z: None,
+            },
+            $c,
+        )
+    }};
 }
 
-macro_rules! z{
-    ($a: expr, $b: expr) => {
-        {
-            Code::Move(Point{x: None, y: None, z: Some($a)}, $b)
-        }
-    }
+macro_rules! z {
+    ($a: expr, $b: expr) => {{
+        Code::Move(
+            Point {
+                x: None,
+                y: None,
+                z: Some($a),
+            },
+            $b,
+        )
+    }};
 }
 
-macro_rules! raw{
-    ($a: expr, $b: expr) => {
-        {
-            Code::Raw(Source {code: $a, comment: Some($b)})
-        }
-    };
-    ($a: expr) => {
-        {
-            Code::Raw(Source {code: $a, comment: None})
-        }
-    }
+macro_rules! raw {
+    ($a: expr, $b: expr) => {{
+        Code::Raw(Source {
+            code: $a,
+            comment: Some($b),
+        })
+    }};
+    ($a: expr) => {{
+        Code::Raw(Source {
+            code: $a,
+            comment: None,
+        })
+    }};
 }
 
-const HOME: Code       = raw!("G28 W",     "Home all without mesh bed level");
-const UNITS_MM: Code   = raw!("G21",       "Set units to millimeters");
-const ABS_COORD: Code  = raw!("G90",       "Use absolute coordinates");
+const HOME: Code = raw!("G28 W", "Home all without mesh bed level");
+const UNITS_MM: Code = raw!("G21", "Set units to millimeters");
+const ABS_COORD: Code = raw!("G90", "Use absolute coordinates");
 const SET_ORIGIN: Code = raw!("G92 X0 Y0", "Set current position to origin");
-const OFF: Code        = raw!("M84",       "Disable motors");
+const OFF: Code = raw!("M84", "Disable motors");
 
 fn rescale(m: f32, rmin: f32, rmax: f32, tmin: f32, tmax: f32) -> f32 {
     ((m - rmin) / (rmax - rmin)) * (tmax - tmin) + tmin
@@ -166,11 +177,11 @@ impl fmt::Display for Code {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             Code::Comment(c) => write!(f, "; {}", c),
-            Code::Model(m)   => write!(f, "M862.3 P \"{}\" ; printer model check", m),
+            Code::Model(m) => write!(f, "M862.3 P \"{}\" ; printer model check", m),
             Code::Message(m) => write!(f, "M117 {}", m),
             Code::Move(p, s) => write!(f, "{}", render_move(p, s)),
-            Code::Raw(src)   => write!(f, "{}", src),
-            Code::NOP        => write!(f, ""),
+            Code::Raw(src) => write!(f, "{}", src),
+            Code::NOP => write!(f, ""),
         }
     }
 }
@@ -182,15 +193,14 @@ impl fmt::Display for Printer {
 }
 
 impl Printer {
-
     pub fn new(config: PrinterConfig) -> Self {
         // TODO: Check if the config is valid?
         // - is z0 > z_draw?
         Printer {
             // TODO: Can we remove this clone?
             config: config.clone(),
-            code:   Vec::new(),
-            width:  config.max.0 - config.min.0,
+            code: Vec::new(),
+            width: config.max.0 - config.min.0,
             height: config.max.1 - config.min.1,
         }
     }
@@ -209,11 +219,13 @@ impl Printer {
 
         // TODO: What to do if x, y are outside the defined print area?
 
-        self.code.push(Code::Comment(format!("draw_point({:.1}, {:.1})", xp, yp)));
+        self.code
+            .push(Code::Comment(format!("draw_point({:.1}, {:.1})", xp, yp)));
         // -> (x, y)
         self.code.push(xy!(x, y, self.config.xy_speed));
         // pen down
-        self.code.push(z!(self.config.z_draw, self.config.down_speed));
+        self.code
+            .push(z!(self.config.z_draw, self.config.down_speed));
         // pen up
         self.code.push(z!(self.config.z0, self.config.up_speed));
         self.code.push(Code::NOP);
@@ -225,19 +237,17 @@ impl Printer {
         let mut curr_point = Point {
             x: Some(0.0),
             y: Some(0.0),
-            z: Some(self.config.z0)
+            z: Some(self.config.z0),
         };
 
         for c in &self.code {
-
             if let Code::Move(p, _) = c {
-                total_dist  += curr_point.dist(p);
+                total_dist += curr_point.dist(p);
 
                 curr_point.x = p.x.or(curr_point.x);
                 curr_point.y = p.y.or(curr_point.y);
                 curr_point.z = p.z.or(curr_point.z);
             }
-
         }
 
         total_dist
@@ -262,12 +272,18 @@ impl Printer {
 
         // Move z first so we don't scrape the print area!
         header.push(z!(self.config.z0, self.config.xy_speed));
-        header.push(xy!(self.config.min.0, self.config.min.1, self.config.xy_speed));
+        header.push(xy!(
+            self.config.min.0,
+            self.config.min.1,
+            self.config.xy_speed
+        ));
         header.push(SET_ORIGIN);
         header.push(Code::Message("0.0%".to_string()));
         header.push(Code::NOP);
 
-        footer.push(Code::Comment("Lift the head up before turning off".to_string()));
+        footer.push(Code::Comment(
+            "Lift the head up before turning off".to_string(),
+        ));
         footer.push(z!(Z_RESET, self.config.xy_speed));
         footer.push(OFF);
         footer.push(Code::NOP);
@@ -279,7 +295,7 @@ impl Printer {
         // TODO: Can we skip based on time instead?
         let mut count = 1;
         let skip = cmp::max(((self.code.len() as f32) * 0.015) as u32, 5); // 5 number of commands
-                                                                           // in draw_point
+        // in draw_point
         let total_time = (Self::total_dist(self) / SPEED) as u32;
         for c in &self.code {
             // TODO: Can we remove this clone?
@@ -292,8 +308,15 @@ impl Printer {
                 let minutes = (total_seconds % 3600) / 60;
                 let seconds = total_seconds % 60;
 
-                write_code(&mut file, Code::Message(
-                        format!("{:.1}% R{:02}:{:02}:{:02}", percent * 100.0, hours, minutes, seconds))
+                write_code(
+                    &mut file,
+                    Code::Message(format!(
+                        "{:.1}% R{:02}:{:02}:{:02}",
+                        percent * 100.0,
+                        hours,
+                        minutes,
+                        seconds
+                    )),
                 )?;
             }
 
@@ -315,15 +338,15 @@ mod tests {
 
     fn test_config() -> PrinterConfig {
         PrinterConfig {
-            model:      Some(Code::Model("MK3S".to_string())), // Printer model check
-            min:       (50.0,  35.0),  // Smallest possible printer (x, y) position
-            max:       (254.0, 212.0), // Largest possible printer (x, y) position
-            scale:      None,          // Original scale to resize based on min and max
-            z0:         6.5,           // z position where the printer can freely move along xy-axis
-            z_draw:     4.0,           // z position where pen meets paper
-            xy_speed:   1000.0,        // Speed when moving through the 2D xy-plane with pen up
-            down_speed: 500.0,         // Speed when lowering the pen (z0 -> z_draw)
-            up_speed:   800.0          // Speed when raising the pen (z_draw -> z0)
+            model: Some(Code::Model("MK3S".to_string())), // Printer model check
+            min: (50.0, 35.0),   // Smallest possible printer (x, y) position
+            max: (254.0, 212.0), // Largest possible printer (x, y) position
+            scale: None,         // Original scale to resize based on min and max
+            z0: 6.5,             // z position where the printer can freely move along xy-axis
+            z_draw: 4.0,         // z position where pen meets paper
+            xy_speed: 1000.0,    // Speed when moving through the 2D xy-plane with pen up
+            down_speed: 500.0,   // Speed when lowering the pen (z0 -> z_draw)
+            up_speed: 800.0,     // Speed when raising the pen (z_draw -> z0)
         }
     }
 
@@ -350,31 +373,59 @@ mod tests {
 
     #[test]
     fn code_move() {
-        let p = Point{x: None, y: None, z: None};
+        let p = Point {
+            x: None,
+            y: None,
+            z: None,
+        };
         let c: Code = Code::Move(p, 1000.0);
         assert_eq!(c.to_string(), "; [WARNING] Move without coordinates!");
 
-        let p = Point{x: Some(0.0), y: None, z: None};
+        let p = Point {
+            x: Some(0.0),
+            y: None,
+            z: None,
+        };
         let c: Code = Code::Move(p, 1000.0);
         assert_eq!(c.to_string(), format!("G{} X0.0 F1000.0", G_MODE));
 
-        let p = Point{x: Some(0.0), y: Some(1.0), z: None};
+        let p = Point {
+            x: Some(0.0),
+            y: Some(1.0),
+            z: None,
+        };
         let c: Code = Code::Move(p, 1000.0);
         assert_eq!(c.to_string(), format!("G{} X0.0 Y1.0 F1000.0", G_MODE));
 
-        let p = Point{x: Some(0.0), y: Some(1.0), z: Some(2.0)};
+        let p = Point {
+            x: Some(0.0),
+            y: Some(1.0),
+            z: Some(2.0),
+        };
         let c: Code = Code::Move(p, 1000.0);
         assert_eq!(c.to_string(), format!("G{} X0.0 Y1.0 Z2.0 F1000.0", G_MODE));
 
-        let p = Point{x: Some(0.0), y: None, z: Some(2.0)};
+        let p = Point {
+            x: Some(0.0),
+            y: None,
+            z: Some(2.0),
+        };
         let c: Code = Code::Move(p, 1000.0);
         assert_eq!(c.to_string(), format!("G{} X0.0 Z2.0 F1000.0", G_MODE));
 
-        let p = Point{x: None, y: None, z: Some(2.0)};
+        let p = Point {
+            x: None,
+            y: None,
+            z: Some(2.0),
+        };
         let c: Code = Code::Move(p, 1000.0);
         assert_eq!(c.to_string(), format!("G{} Z2.0 F1000.0", G_MODE));
 
-        let p = Point{x: None, y: Some(1.0), z: None};
+        let p = Point {
+            x: None,
+            y: Some(1.0),
+            z: None,
+        };
         let c: Code = Code::Move(p, 1000.0);
         assert_eq!(c.to_string(), format!("G{} Y1.0 F1000.0", G_MODE));
     }
@@ -424,4 +475,3 @@ mod tests {
         assert_within(actual, expected, 0.01);
     }
 }
-
