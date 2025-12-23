@@ -110,7 +110,7 @@ fn write_code(f: &mut File, c: Code) -> Result<(), io::Error> {
 fn render_move(point: &Point, feed: &f32) -> String {
     let point_str = point.to_string();
 
-    if point_str.len() == 0 {
+    if point_str.is_empty() {
         Code::Comment("[WARNING] Move without coordinates!".to_string()).to_string()
     } else {
         format!("G{} {} F{:.1}", G_MODE, point_str, feed)
@@ -136,13 +136,13 @@ impl fmt::Display for Point {
         let y = render_coord('Y', self.y);
         let z = render_coord('Z', self.z);
 
-        let x_space = if x.len() > 0 && (y.len() > 0 || z.len() > 0) {
+        let x_space = if !x.is_empty() && (!y.is_empty() || !z.is_empty()) {
             " "
         } else {
             ""
         };
 
-        let y_space = if y.len() > 0 && z.len() > 0 {
+        let y_space = if !y.is_empty() && !z.is_empty() {
             " "
         } else {
             ""
@@ -169,7 +169,7 @@ impl fmt::Display for Code {
             Code::Model(m)   => write!(f, "M862.3 P \"{}\" ; printer model check", m),
             Code::Message(m) => write!(f, "M117 {}", m),
             Code::Move(p, s) => write!(f, "{}", render_move(p, s)),
-            Code::Raw(src)   => write!(f, "{}", src.to_string()),
+            Code::Raw(src)   => write!(f, "{}", src),
             Code::NOP        => write!(f, ""),
         }
     }
@@ -231,7 +231,7 @@ impl Printer {
         for c in &self.code {
 
             if let Code::Move(p, _) = c {
-                total_dist  += curr_point.dist(&p);
+                total_dist  += curr_point.dist(p);
 
                 curr_point.x = p.x.or(curr_point.x);
                 curr_point.y = p.y.or(curr_point.y);
@@ -297,7 +297,7 @@ impl Printer {
                 )?;
             }
 
-            count = count + 1;
+            count += 1;
         }
 
         for c in footer {
